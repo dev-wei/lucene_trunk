@@ -50,6 +50,6 @@ solr/core/test-lib/
 
 solr/server/start.jar
 
-
+maven-build
 .svn
 .hgignore

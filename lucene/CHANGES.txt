@@ -46,6 +46,11 @@ Optimizations
   instead of a separate merge sort for each segment.  In delete-heavy
   use cases this can be a sizable speedup. (Mike McCandless)
 
+API Changes
+
+* LUCENE-6204, LUCENE-6208: Simplify CompoundFormat: remove files()
+  and remove files parameter to write(). (Robert Muir)
+
 Other
 
 * LUCENE-6193: Collapse identical catch branches in try-catch statements.
@@ -470,7 +475,15 @@ Bug Fixes
   
 * LUCENE-6173: NumericTermAttribute and spatial/CellTokenStream do not clone
   their BytesRef(Builder)s. Also equals/hashCode was missing.  (Uwe Schindler)
+
+* LUCENE-6205: Fixed intermittent concurrency issue that could cause
+  FileNotFoundException when writing doc values updates at the same
+  time that a merge kicks off.  (Mike McCandless)
   
+* LUCENE-6192: Fix int overflow corruption case in skip data for
+  high frequency terms in extremely large indices (Robert Muir, Mike
+  McCandless)
+
 Documentation
 
 * LUCENE-5392: Add/improve analysis package documentation to reflect
@@ -533,12 +546,19 @@ Other
 
 * LUCENE-5915: Remove Pulsing postings format. (Robert Muir)
 
+======================= Lucene 4.10.4 ======================
+
+* LUCENE-6207: Fixed consumption of several terms enums on the same
+  sorted (set) doc values instance at the same time.
+  (Tom Shally, Robert Muir, Adrien Grand)
+
 ======================= Lucene 4.10.3 ======================
 
 Bug fixes
 
 * LUCENE-3229: Overlapping ordered SpanNearQuery spans should not match.
   (Ludovic Boutros, Paul Elschot, Greg Dearing, ehatcher)
+
 
 ======================= Lucene 4.10.2 ======================
 
