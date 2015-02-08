@@ -30,15 +30,13 @@ import org.apache.lucene.analysis.MockAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field.Store;
 import org.apache.lucene.document.TextField;
-import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.RandomIndexWriter;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.BooleanClause.Occur;
-import org.apache.lucene.search.BooleanQuery.BooleanWeight;
 import org.apache.lucene.search.Scorer.ChildScorer;
-import org.apache.lucene.search.Weight.DefaultBulkScorer;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.LuceneTestCase;
@@ -192,16 +190,19 @@ public class TestBooleanQueryVisitSubscorers extends LuceneTestCase {
     query.add(new TermQuery(new Term(F2, "web")), Occur.SHOULD);
     query.add(new TermQuery(new Term(F2, "crawler")), Occur.SHOULD);
     query.setMinimumNumberShouldMatch(2);
+    query.add(new MatchAllDocsQuery(), Occur.MUST);
     ScorerSummarizingCollector collector = new ScorerSummarizingCollector();
     searcher.search(query, collector);
     assertEquals(1, collector.getNumHits());
     assertFalse(collector.getSummaries().isEmpty());
     for (String summary : collector.getSummaries()) {
       assertEquals(
-          "MinShouldMatchSumScorer\n" +
-          "    SHOULD TermScorer body:nutch\n" +
-          "    SHOULD TermScorer body:web\n" +
-          "    SHOULD TermScorer body:crawler", summary);
+          "CoordinatingConjunctionScorer\n" +
+          "    MUST MinShouldMatchSumScorer\n" +
+          "            SHOULD TermScorer body:nutch\n" +
+          "            SHOULD TermScorer body:web\n" +
+          "            SHOULD TermScorer body:crawler\n" +
+          "    MUST MatchAllScorer", summary);
     }
   }
 
@@ -230,6 +231,11 @@ public class TestBooleanQueryVisitSubscorers extends LuceneTestCase {
 
     public List<String> getSummaries() {
       return summaries;
+    }
+    
+    @Override
+    public boolean needsScores() {
+      return true;
     }
 
     @Override
@@ -276,8 +282,8 @@ public class TestBooleanQueryVisitSubscorers extends LuceneTestCase {
   static class BooleanQuery2 extends BooleanQuery {
 
     @Override
-    public Weight createWeight(IndexSearcher searcher) throws IOException {
-      return new BooleanWeight(searcher, false) {
+    public Weight createWeight(IndexSearcher searcher, boolean needsScores) throws IOException {
+      return new BooleanWeight(this, searcher, needsScores, false) {
         @Override
         public BulkScorer bulkScorer(LeafReaderContext context, Bits acceptDocs) throws IOException {
           Scorer scorer = scorer(context, acceptDocs);

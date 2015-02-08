@@ -17,15 +17,21 @@ package org.apache.lucene.queries.function;
  * limitations under the License.
  */
 
-import org.apache.lucene.index.LeafReaderContext;
-import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.index.Term;
-import org.apache.lucene.search.*;
-import org.apache.lucene.util.Bits;
-
 import java.io.IOException;
-import java.util.Set;
 import java.util.Map;
+import java.util.Set;
+
+import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.search.ComplexExplanation;
+import org.apache.lucene.search.Explanation;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.Scorer;
+import org.apache.lucene.search.Weight;
+import org.apache.lucene.util.Bits;
+import org.apache.lucene.util.BytesRef;
 
 
 /**
@@ -66,14 +72,10 @@ public class FunctionQuery extends Query {
     protected final Map context;
 
     public FunctionWeight(IndexSearcher searcher) throws IOException {
+      super(FunctionQuery.this);
       this.searcher = searcher;
       this.context = ValueSource.newContext(searcher);
       func.createWeight(context, searcher);
-    }
-
-    @Override
-    public Query getQuery() {
-      return FunctionQuery.this;
     }
 
     @Override
@@ -166,6 +168,26 @@ public class FunctionQuery extends Query {
       return 1;
     }
 
+    @Override
+    public int nextPosition() throws IOException {
+      return -1;
+    }
+
+    @Override
+    public int startOffset() throws IOException {
+      return -1;
+    }
+
+    @Override
+    public int endOffset() throws IOException {
+      return -1;
+    }
+
+    @Override
+    public BytesRef getPayload() throws IOException {
+      return null;
+    }
+
     public Explanation explain(int doc) throws IOException {
       float sc = qWeight * vals.floatVal(doc);
 
@@ -177,11 +199,12 @@ public class FunctionQuery extends Query {
       result.addDetail(new Explanation(weight.queryNorm,"queryNorm"));
       return result;
     }
+
   }
 
 
   @Override
-  public Weight createWeight(IndexSearcher searcher) throws IOException {
+  public Weight createWeight(IndexSearcher searcher, boolean needsScores) throws IOException {
     return new FunctionQuery.FunctionWeight(searcher);
   }
 

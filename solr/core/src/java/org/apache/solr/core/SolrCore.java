@@ -162,7 +162,8 @@ public final class SolrCore implements SolrInfoMBean, Closeable {
   public static Map<SolrCore,Exception> openHandles = Collections.synchronizedMap(new IdentityHashMap<SolrCore, Exception>());
 
   
-  public static Logger log = LoggerFactory.getLogger(SolrCore.class);
+  public static final Logger log = LoggerFactory.getLogger(SolrCore.class);
+  public static final Logger requestLog = LoggerFactory.getLogger(SolrCore.class.getName() + ".Request");
 
   private String name;
   private String logid; // used to show what name is set
@@ -536,7 +537,7 @@ public final class SolrCore implements SolrInfoMBean, Closeable {
         log.warn(logid+"Solr index directory '" + new File(indexDir) + "' doesn't exist."
                 + " Creating new index...");
 
-        SolrIndexWriter writer = SolrIndexWriter.create("SolrCore.initIndex", indexDir, getDirectoryFactory(), true, 
+        SolrIndexWriter writer = SolrIndexWriter.create(this, "SolrCore.initIndex", indexDir, getDirectoryFactory(), true, 
                                                         getLatestSchema(), solrConfig.indexConfig, solrDelPolicy, codec);
         writer.close();
       }
@@ -553,20 +554,35 @@ public final class SolrCore implements SolrInfoMBean, Closeable {
    *@throws SolrException if the object could not be instantiated
    */
   private <T> T createInstance(String className, Class<T> cast, String msg) {
+    return createInstance(className,cast,msg, this);
+  }
+
+  /**
+   * Creates an instance by trying a constructor that accepts a SolrCore before
+   * trying the default (no arg) constructor.
+   *
+   * @param className the instance class to create
+   * @param cast      the class or interface that the instance should extend or implement
+   * @param msg       a message helping compose the exception error if any occurs.
+   * @param core      The SolrCore instance for which this object needs to be loaded
+   * @return the desired instance
+   * @throws SolrException if the object could not be instantiated
+   */
+  public static <T> T createInstance(String className, Class<T> cast, String msg, SolrCore core) {
     Class<? extends T> clazz = null;
     if (msg == null) msg = "SolrCore Object";
     try {
-        clazz = getResourceLoader().findClass(className, cast);
-        //most of the classes do not have constructors which takes SolrCore argument. It is recommended to obtain SolrCore by implementing SolrCoreAware.
-        // So invariably always it will cause a  NoSuchMethodException. So iterate though the list of available constructors
-        Constructor<?>[] cons =  clazz.getConstructors();
-        for (Constructor<?> con : cons) {
-          Class<?>[] types = con.getParameterTypes();
-          if(types.length == 1 && types[0] == SolrCore.class){
-            return cast.cast(con.newInstance(this));
-          }
+      clazz = core.getResourceLoader().findClass(className, cast);
+      //most of the classes do not have constructors which takes SolrCore argument. It is recommended to obtain SolrCore by implementing SolrCoreAware.
+      // So invariably always it will cause a  NoSuchMethodException. So iterate though the list of available constructors
+      Constructor<?>[] cons = clazz.getConstructors();
+      for (Constructor<?> con : cons) {
+        Class<?>[] types = con.getParameterTypes();
+        if (types.length == 1 && types[0] == SolrCore.class) {
+          return cast.cast(con.newInstance(core));
         }
-        return getResourceLoader().newInstance(className, cast);//use the empty constructor
+      }
+      return core.getResourceLoader().newInstance(className, cast);//use the empty constructor
     } catch (SolrException e) {
       throw e;
     } catch (Exception e) {
@@ -577,7 +593,7 @@ public final class SolrCore implements SolrInfoMBean, Closeable {
         throw inner;
       }
 
-      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR,"Error Instantiating "+msg+", "+className+ " failed to instantiate " +cast.getName(), e);
+      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Error Instantiating " + msg + ", " + className + " failed to instantiate " + cast.getName(), e);
     }
   }
   
@@ -1998,6 +2014,11 @@ public final class SolrCore implements SolrInfoMBean, Closeable {
 
     preDecorateResponse(req, rsp);
 
+    if (requestLog.isDebugEnabled() && rsp.getToLog().size() > 0) {
+      // log request at debug in case something goes wrong and we aren't able to log later
+      requestLog.debug(rsp.getToLogAsString(logid));
+    }
+
     // TODO: this doesn't seem to be working correctly and causes problems with the example server and distrib (for example /spell)
     // if (req.getParams().getBool(ShardParams.IS_SHARD,false) && !(handler instanceof SearchHandler))
     //   throw new SolrException(SolrException.ErrorCode.BAD_REQUEST,"isShard is only acceptable with search handlers");
@@ -2007,8 +2028,8 @@ public final class SolrCore implements SolrInfoMBean, Closeable {
     postDecorateResponse(handler, req, rsp);
 
     if (rsp.getToLog().size() > 0) {
-      if (log.isInfoEnabled()) {
-        log.info(rsp.getToLogAsString(logid));
+      if (requestLog.isInfoEnabled()) {
+        requestLog.info(rsp.getToLogAsString(logid));
       }
 
       if (log.isWarnEnabled()) {

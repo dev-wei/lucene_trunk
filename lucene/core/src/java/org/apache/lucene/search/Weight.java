@@ -19,8 +19,8 @@ package org.apache.lucene.search;
 
 import java.io.IOException;
 
+import org.apache.lucene.index.IndexReaderContext;
 import org.apache.lucene.index.LeafReaderContext;
-import org.apache.lucene.index.IndexReaderContext; // javadocs
 import org.apache.lucene.search.similarities.Similarity;
 import org.apache.lucene.util.Bits;
 
@@ -41,7 +41,7 @@ import org.apache.lucene.util.Bits;
  * A <code>Weight</code> is used in the following way:
  * <ol>
  * <li>A <code>Weight</code> is constructed by a top-level query, given a
- * <code>IndexSearcher</code> ({@link Query#createWeight(IndexSearcher)}).
+ * <code>IndexSearcher</code> ({@link Query#createWeight(IndexSearcher, boolean)}).
  * <li>The {@link #getValueForNormalization()} method is called on the
  * <code>Weight</code> to compute the query normalization factor
  * {@link Similarity#queryNorm(float)} of the query clauses contained in the
@@ -56,6 +56,15 @@ import org.apache.lucene.util.Bits;
  */
 public abstract class Weight {
 
+  protected final Query parentQuery;
+
+  /** Sole constructor, typically invoked by sub-classes.
+   * @param query         the parent query
+   */
+  protected Weight(Query query) {
+    this.parentQuery = query;
+  }
+
   /**
    * An explanation of the score computation for the named document.
    * 
@@ -67,7 +76,9 @@ public abstract class Weight {
   public abstract Explanation explain(LeafReaderContext context, int doc) throws IOException;
 
   /** The query that this concerns. */
-  public abstract Query getQuery();
+  public final Query getQuery() {
+    return parentQuery;
+  }
   
   /** The value for normalization of contained query clauses (e.g. sum of squared weights). */
   public abstract float getValueForNormalization() throws IOException;
@@ -136,6 +147,11 @@ public abstract class Weight {
     }
 
     @Override
+    public long cost() {
+      return scorer.cost();
+    }
+
+    @Override
     public int score(LeafCollector collector, int min, int max) throws IOException {
       // TODO: this may be sort of weird, when we are
       // embedded in a BooleanScorer, because we are
@@ -178,4 +194,5 @@ public abstract class Weight {
       }
     }
   }
+
 }

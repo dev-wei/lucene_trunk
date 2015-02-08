@@ -17,31 +17,38 @@ package org.apache.lucene.search.spans;
  * limitations under the License.
  */
 
-import org.apache.lucene.index.LeafReaderContext;
-import org.apache.lucene.index.IndexReaderContext;
-import org.apache.lucene.index.Term;
-import org.apache.lucene.index.TermContext;
-import org.apache.lucene.search.*;
-import org.apache.lucene.search.similarities.Similarity;
-import org.apache.lucene.search.similarities.Similarity.SimScorer;
-import org.apache.lucene.util.Bits;
-
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeSet;
 
+import org.apache.lucene.index.IndexReaderContext;
+import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.index.TermContext;
+import org.apache.lucene.search.ComplexExplanation;
+import org.apache.lucene.search.Explanation;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.Scorer;
+import org.apache.lucene.search.TermStatistics;
+import org.apache.lucene.search.Weight;
+import org.apache.lucene.search.similarities.Similarity;
+import org.apache.lucene.search.similarities.Similarity.SimScorer;
+import org.apache.lucene.util.Bits;
+
 /**
  * Expert-only.  Public for use by other weight implementations
  */
 public class SpanWeight extends Weight {
-  protected Similarity similarity;
-  protected Map<Term,TermContext> termContexts;
-  protected SpanQuery query;
+  protected final Similarity similarity;
+  protected final Map<Term,TermContext> termContexts;
+  protected final SpanQuery query;
   protected Similarity.SimWeight stats;
 
   public SpanWeight(SpanQuery query, IndexSearcher searcher)
     throws IOException {
+    super(query);
     this.similarity = searcher.getSimilarity();
     this.query = query;
     
@@ -64,9 +71,6 @@ public class SpanWeight extends Weight {
                                        termStats);
     }
   }
-
-  @Override
-  public Query getQuery() { return query; }
 
   @Override
   public float getValueForNormalization() throws IOException {

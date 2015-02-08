@@ -17,7 +17,6 @@ package org.apache.lucene.search;
  * limitations under the License.
  */
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -34,7 +33,6 @@ import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
-import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.MultiReader;
 import org.apache.lucene.index.RandomIndexWriter;
 import org.apache.lucene.index.Term;
@@ -233,7 +231,7 @@ public class TestBooleanQuery extends LuceneTestCase {
         q.add(new BooleanClause(new TermQuery(new Term("field", term)), BooleanClause.Occur.SHOULD));
       }
 
-      Weight weight = s.createNormalizedWeight(q);
+      Weight weight = s.createNormalizedWeight(q, true);
 
       Scorer scorer = weight.scorer(s.leafContexts.get(0), null);
 
@@ -251,7 +249,7 @@ public class TestBooleanQuery extends LuceneTestCase {
       // verify exact match:
       for(int iter2=0;iter2<10;iter2++) {
 
-        weight = s.createNormalizedWeight(q);
+        weight = s.createNormalizedWeight(q, true);
         scorer = weight.scorer(s.leafContexts.get(0), null);
 
         if (VERBOSE) {

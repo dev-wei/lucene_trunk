@@ -25,7 +25,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import org.apache.solr.SolrTestCaseJ4;
+import org.apache.lucene.util.LuceneTestCase.BadApple;
+
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.cloud.AbstractFullDistribZkTestBase;

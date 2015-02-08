@@ -25,14 +25,55 @@ import java.util.List;
 import java.util.Locale;
 
 import org.apache.lucene.analysis.MockAnalyzer;
-import org.apache.lucene.document.*;
-import org.apache.lucene.index.*;
-import org.apache.lucene.search.*;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.IntField;
+import org.apache.lucene.document.NumericDocValuesField;
+import org.apache.lucene.document.SortedDocValuesField;
+import org.apache.lucene.document.StoredField;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.PostingsEnum;
+import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.index.LogDocMergePolicy;
+import org.apache.lucene.index.MultiFields;
+import org.apache.lucene.index.NoMergePolicy;
+import org.apache.lucene.index.RandomIndexWriter;
+import org.apache.lucene.index.ReaderUtil;
+import org.apache.lucene.index.StoredDocument;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanClause.Occur;
+import org.apache.lucene.search.BooleanQuery;
+import org.apache.lucene.search.DocIdSetIterator;
+import org.apache.lucene.search.Explanation;
+import org.apache.lucene.search.FieldDoc;
+import org.apache.lucene.search.Filter;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.MatchAllDocsQuery;
+import org.apache.lucene.search.MultiTermQuery;
+import org.apache.lucene.search.NumericRangeQuery;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.QueryUtils;
+import org.apache.lucene.search.QueryWrapperFilter;
+import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.Sort;
+import org.apache.lucene.search.SortField;
+import org.apache.lucene.search.TermQuery;
+import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.search.Weight;
 import org.apache.lucene.search.grouping.GroupDocs;
 import org.apache.lucene.search.grouping.TopGroups;
 import org.apache.lucene.store.Directory;
-import org.apache.lucene.util.*;
+import org.apache.lucene.util.BitSet;
+import org.apache.lucene.util.Bits;
+import org.apache.lucene.util.BytesRef;
+import org.apache.lucene.util.BytesRefBuilder;
+import org.apache.lucene.util.LuceneTestCase;
+import org.apache.lucene.util.NumericUtils;
+import org.apache.lucene.util.TestUtil;
 
 public class TestBlockJoin extends LuceneTestCase {
 
@@ -190,7 +231,7 @@ public class TestBlockJoin extends LuceneTestCase {
     //System.out.println("TEST: now test up");
 
     // Now join "up" (map parent hits to child docs) instead...:
-    ToChildBlockJoinQuery parentJoinQuery = new ToChildBlockJoinQuery(parentQuery, parentsFilter, random().nextBoolean());
+    ToChildBlockJoinQuery parentJoinQuery = new ToChildBlockJoinQuery(parentQuery, parentsFilter);
     BooleanQuery fullChildQuery = new BooleanQuery();
     fullChildQuery.add(new BooleanClause(parentJoinQuery, Occur.MUST));
     fullChildQuery.add(new BooleanClause(childQuery, Occur.MUST));
@@ -334,15 +375,15 @@ public class TestBlockJoin extends LuceneTestCase {
     TermQuery us = new TermQuery(new Term("country", "United States"));
     assertEquals("@ US we have java and ruby", 2, 
         s.search(new ToChildBlockJoinQuery(us, 
-                          parentsFilter, random().nextBoolean()), 10).totalHits );
+                          parentsFilter), 10).totalHits );
 
-    assertEquals("java skills in US", 1, s.search(new ToChildBlockJoinQuery(us, parentsFilter, random().nextBoolean()),
+    assertEquals("java skills in US", 1, s.search(new ToChildBlockJoinQuery(us, parentsFilter),
         skill("java"), 10).totalHits );
 
     BooleanQuery rubyPython = new BooleanQuery();
     rubyPython.add(new TermQuery(new Term("skill", "ruby")), Occur.SHOULD);
     rubyPython.add(new TermQuery(new Term("skill", "python")), Occur.SHOULD);
-    assertEquals("ruby skills in US", 1, s.search(new ToChildBlockJoinQuery(us, parentsFilter, random().nextBoolean()),
+    assertEquals("ruby skills in US", 1, s.search(new ToChildBlockJoinQuery(us, parentsFilter),
                                           new QueryWrapperFilter(rubyPython), 10).totalHits );
 
     r.close();
@@ -624,9 +665,9 @@ public class TestBlockJoin extends LuceneTestCase {
       for(int docIDX=0;docIDX<joinR.maxDoc();docIDX++) {
         System.out.println("  docID=" + docIDX + " doc=" + joinR.document(docIDX) + " deleted?=" + (liveDocs != null && liveDocs.get(docIDX) == false));
       }
-      DocsEnum parents = MultiFields.getTermDocsEnum(joinR, null, "isParent", new BytesRef("x"));
+      PostingsEnum parents = MultiFields.getTermDocsEnum(joinR, null, "isParent", new BytesRef("x"));
       System.out.println("parent docIDs:");
-      while (parents.nextDoc() != DocsEnum.NO_MORE_DOCS) {
+      while (parents.nextDoc() != PostingsEnum.NO_MORE_DOCS) {
         System.out.println("  " + parents.docID());
       }
     }
@@ -878,7 +919,7 @@ public class TestBlockJoin extends LuceneTestCase {
       }
 
       // Maps parent query to child docs:
-      final ToChildBlockJoinQuery parentJoinQuery2 = new ToChildBlockJoinQuery(parentQuery2, parentsFilter, random().nextBoolean());
+      final ToChildBlockJoinQuery parentJoinQuery2 = new ToChildBlockJoinQuery(parentQuery2, parentsFilter);
 
       // To run against the block-join index:
       final Query childJoinQuery2;
@@ -1147,7 +1188,7 @@ public class TestBlockJoin extends LuceneTestCase {
                               new TermQuery(new Term("parent", "1"))));
 
     ToParentBlockJoinQuery q = new ToParentBlockJoinQuery(tq, parentFilter, ScoreMode.Avg);
-    Weight weight = s.createNormalizedWeight(q);
+    Weight weight = s.createNormalizedWeight(q, true);
     DocIdSetIterator disi = weight.scorer(s.getIndexReader().leaves().get(0), null);
     assertEquals(1, disi.advance(1));
     r.close();
@@ -1181,7 +1222,7 @@ public class TestBlockJoin extends LuceneTestCase {
                               new TermQuery(new Term("isparent", "yes"))));
 
     ToParentBlockJoinQuery q = new ToParentBlockJoinQuery(tq, parentFilter, ScoreMode.Avg);
-    Weight weight = s.createNormalizedWeight(q);
+    Weight weight = s.createNormalizedWeight(q, true);
     DocIdSetIterator disi = weight.scorer(s.getIndexReader().leaves().get(0), null);
     assertEquals(2, disi.advance(0));
     r.close();
@@ -1507,7 +1548,7 @@ public class TestBlockJoin extends LuceneTestCase {
 
     Query parentQuery = new TermQuery(new Term("parent", "2"));
 
-    ToChildBlockJoinQuery parentJoinQuery = new ToChildBlockJoinQuery(parentQuery, parentsFilter, random().nextBoolean());
+    ToChildBlockJoinQuery parentJoinQuery = new ToChildBlockJoinQuery(parentQuery, parentsFilter);
     TopDocs topdocs = s.search(parentJoinQuery, 3);
     assertEquals(1, topdocs.totalHits);
     

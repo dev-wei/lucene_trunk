@@ -30,7 +30,7 @@ import org.apache.lucene.codecs.PostingsReaderBase;
 import org.apache.lucene.codecs.PostingsWriterBase;
 import org.apache.lucene.codecs.blocktree.BlockTreeTermsReader;
 import org.apache.lucene.codecs.blocktree.BlockTreeTermsWriter;
-import org.apache.lucene.index.DocsEnum;
+import org.apache.lucene.index.PostingsEnum;
 import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.SegmentReadState;
 import org.apache.lucene.index.SegmentWriteState;
@@ -95,7 +95,6 @@ import org.apache.lucene.util.packed.PackedInts;
  *      this reduces disk pre-fetches.</p>
  *   </li>
  * </ul>
- * </p>
  *
  * <p>
  * Files and detailed format:
@@ -106,9 +105,8 @@ import org.apache.lucene.util.packed.PackedInts;
  *   <li><tt>.pos</tt>: <a href="#Positions">Positions</a></li>
  *   <li><tt>.pay</tt>: <a href="#Payloads">Payloads and Offsets</a></li>
  * </ul>
- * </p>
  *
- * <a name="Termdictionary" id="Termdictionary"></a>
+ * <a name="Termdictionary"></a>
  * <dl>
  * <dd>
  * <b>Term Dictionary</b>
@@ -118,11 +116,10 @@ import org.apache.lucene.util.packed.PackedInts;
  * and pointers to the frequencies, positions, payload and
  * skip data in the .doc, .pos, and .pay files.
  * See {@link BlockTreeTermsWriter} for more details on the format.
- * </p>
  *
  * <p>NOTE: The term dictionary can plug into different postings implementations:
  * the postings writer/reader are actually responsible for encoding 
- * and decoding the PostingsHeader and TermMetadata sections described here:</p>
+ * and decoding the PostingsHeader and TermMetadata sections described here:
  *
  * <ul>
  *   <li>PostingsHeader --&gt; Header, PackedBlockSize</li>
@@ -133,7 +130,7 @@ import org.apache.lucene.util.packed.PackedInts;
  *   <li>DocFPDelta, PosFPDelta, PayFPDelta, PosVIntBlockFPDelta, SkipFPDelta --&gt; {@link DataOutput#writeVLong VLong}</li>
  *   <li>Footer --&gt; {@link CodecUtil#writeFooter CodecFooter}</li>
  * </ul>
- * <p>Notes:</p>
+ * <p>Notes:
  * <ul>
  *    <li>Header is a {@link CodecUtil#writeIndexHeader IndexHeader} storing the version information
  *        for the postings.</li>
@@ -141,7 +138,7 @@ import org.apache.lucene.util.packed.PackedInts;
  *        determined by the largest integer. Smaller block size result in smaller variance among width 
  *        of integers hence smaller indexes. Larger block size result in more efficient bulk i/o hence
  *        better acceleration. This value should always be a multiple of 64, currently fixed as 128 as 
- *        a tradeoff. It is also the skip interval used to accelerate {@link DocsEnum#advance(int)}.
+ *        a tradeoff. It is also the skip interval used to accelerate {@link org.apache.lucene.index.PostingsEnum#advance(int)}.
  *    <li>DocFPDelta determines the position of this term's TermFreqs within the .doc file. 
  *        In particular, it is the difference of file offset between this term's
  *        data and previous term's data (or zero, for the first term in the block).On disk it is 
@@ -169,17 +166,17 @@ import org.apache.lucene.util.packed.PackedInts;
  * </dd>
  * </dl>
  *
- * <a name="Termindex" id="Termindex"></a>
+ * <a name="Termindex"></a>
  * <dl>
  * <dd>
  * <b>Term Index</b>
  * <p>The .tip file contains an index into the term dictionary, so that it can be 
- * accessed randomly.  See {@link BlockTreeTermsWriter} for more details on the format.</p>
+ * accessed randomly.  See {@link BlockTreeTermsWriter} for more details on the format.
  * </dd>
  * </dl>
  *
  *
- * <a name="Frequencies" id="Frequencies"></a>
+ * <a name="Frequencies"></a>
  * <dl>
  * <dd>
  * <b>Frequencies and Skip Data</b>
@@ -208,7 +205,7 @@ import org.apache.lucene.util.packed.PackedInts;
  *   <li>SkipChildLevelPointer --&gt; {@link DataOutput#writeVLong VLong}</li>
  *   <li>Footer --&gt; {@link CodecUtil#writeFooter CodecFooter}</li>
  * </ul>
- * <p>Notes:</p>
+ * <p>Notes:
  * <ul>
  *   <li>PackedDocDeltaBlock is theoretically generated from two steps: 
  *     <ol>
@@ -267,7 +264,7 @@ import org.apache.lucene.util.packed.PackedInts;
  * </dd>
  * </dl>
  *
- * <a name="Positions" id="Positions"></a>
+ * <a name="Positions"></a>
  * <dl>
  * <dd>
  * <b>Positions</b>
@@ -286,7 +283,7 @@ import org.apache.lucene.util.packed.PackedInts;
  *   <li>PayloadData --&gt; {@link DataOutput#writeByte byte}<sup>PayLength</sup></li>
  *   <li>Footer --&gt; {@link CodecUtil#writeFooter CodecFooter}</li>
  * </ul>
- * <p>Notes:</p>
+ * <p>Notes:
  * <ul>
  *   <li>TermPositions are order by term (terms are implicit, from the term dictionary), and position 
  *       values for each term document pair are incremental, and ordered by document number.</li>
@@ -320,12 +317,12 @@ import org.apache.lucene.util.packed.PackedInts;
  * </dd>
  * </dl>
  *
- * <a name="Payloads" id="Payloads"></a>
+ * <a name="Payloads"></a>
  * <dl>
  * <dd>
  * <b>Payloads and Offsets</b>
  * <p>The .pay file will store payloads and offsets associated with certain term-document positions. 
- *    Some payloads and offsets will be separated out into .pos file, for performance reasons.</p>
+ *    Some payloads and offsets will be separated out into .pos file, for performance reasons.
  * <ul>
  *   <li>PayFile(.pay): --&gt; Header, &lt;TermPayloads, TermOffsets?&gt; <sup>TermCount</sup>, Footer</li>
  *   <li>Header --&gt; {@link CodecUtil#writeIndexHeader IndexHeader}</li>
@@ -336,7 +333,7 @@ import org.apache.lucene.util.packed.PackedInts;
  *   <li>PayData --&gt; {@link DataOutput#writeByte byte}<sup>SumPayLength</sup></li>
  *   <li>Footer --&gt; {@link CodecUtil#writeFooter CodecFooter}</li>
  * </ul>
- * <p>Notes:</p>
+ * <p>Notes:
  * <ul>
  *   <li>The order of TermPayloads/TermOffsets will be the same as TermPositions, note that part of 
  *       payload/offsets are stored in .pos.</li>
@@ -352,7 +349,6 @@ import org.apache.lucene.util.packed.PackedInts;
  * </ul>
  * </dd>
  * </dl>
- * </p>
  *
  * @lucene.experimental
  */

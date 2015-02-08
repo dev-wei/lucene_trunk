@@ -22,19 +22,18 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Set;
 
-import org.apache.lucene.index.LeafReaderContext;
-import org.apache.lucene.index.DocsAndPositionsEnum;
-import org.apache.lucene.index.DocsEnum;
+import org.apache.lucene.index.PostingsEnum;
 import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.index.LeafReader;
 import org.apache.lucene.index.IndexReaderContext;
+import org.apache.lucene.index.LeafReader;
+import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.index.TermContext;
 import org.apache.lucene.index.TermState;
 import org.apache.lucene.index.Terms;
 import org.apache.lucene.index.TermsEnum;
-import org.apache.lucene.search.similarities.Similarity.SimScorer;
 import org.apache.lucene.search.similarities.Similarity;
+import org.apache.lucene.search.similarities.Similarity.SimScorer;
 import org.apache.lucene.util.ArrayUtil;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.ToStringUtils;
@@ -138,13 +137,13 @@ public class PhraseQuery extends Query {
   }
 
   static class PostingsAndFreq implements Comparable<PostingsAndFreq> {
-    final DocsAndPositionsEnum postings;
+    final PostingsEnum postings;
     final int docFreq;
     final int position;
     final Term[] terms;
     final int nTerms; // for faster comparisons
 
-    public PostingsAndFreq(DocsAndPositionsEnum postings, int docFreq, int position, Term... terms) {
+    public PostingsAndFreq(PostingsEnum postings, int docFreq, int position, Term... terms) {
       this.postings = postings;
       this.docFreq = docFreq;
       this.position = position;
@@ -212,10 +211,13 @@ public class PhraseQuery extends Query {
   private class PhraseWeight extends Weight {
     private final Similarity similarity;
     private final Similarity.SimWeight stats;
+    private final boolean needsScores;
     private transient TermContext states[];
 
-    public PhraseWeight(IndexSearcher searcher)
+    public PhraseWeight(IndexSearcher searcher, boolean needsScores)
       throws IOException {
+      super(PhraseQuery.this);
+      this.needsScores = needsScores;
       this.similarity = searcher.getSimilarity();
       final IndexReaderContext context = searcher.getTopReaderContext();
       states = new TermContext[terms.size()];
@@ -230,9 +232,6 @@ public class PhraseQuery extends Query {
 
     @Override
     public String toString() { return "weight(" + PhraseQuery.this + ")"; }
-
-    @Override
-    public Query getQuery() { return PhraseQuery.this; }
 
     @Override
     public float getValueForNormalization() {
@@ -267,7 +266,7 @@ public class PhraseQuery extends Query {
           return null;
         }
         te.seekExact(t.bytes(), state);
-        DocsAndPositionsEnum postingsEnum = te.docsAndPositions(liveDocs, null, DocsEnum.FLAG_NONE);
+        PostingsEnum postingsEnum = te.postings(liveDocs, null, PostingsEnum.FLAG_POSITIONS);
 
         // PhraseQuery on a field that did not index
         // positions.
@@ -276,7 +275,7 @@ public class PhraseQuery extends Query {
           // term does exist, but has no positions
           throw new IllegalStateException("field \"" + t.field() + "\" was indexed without position data; cannot run PhraseQuery (term=" + t.text() + ")");
         }
-        postingsFreqs[i] = new PostingsAndFreq(postingsEnum, te.docFreq(), positions.get(i).intValue(), t);
+        postingsFreqs[i] = new PostingsAndFreq(postingsEnum, te.docFreq(), positions.get(i), t);
       }
 
       // sort by increasing docFreq order
@@ -285,9 +284,9 @@ public class PhraseQuery extends Query {
       }
 
       if (slop == 0) {  // optimize exact case
-        return new ExactPhraseScorer(this, postingsFreqs, similarity.simScorer(stats, context));
+        return new ExactPhraseScorer(this, postingsFreqs, similarity.simScorer(stats, context), needsScores);
       } else {
-        return new SloppyPhraseScorer(this, postingsFreqs, slop, similarity.simScorer(stats, context));
+        return new SloppyPhraseScorer(this, postingsFreqs, slop, similarity.simScorer(stats, context), needsScores);
       }
     }
     
@@ -319,8 +318,8 @@ public class PhraseQuery extends Query {
   }
 
   @Override
-  public Weight createWeight(IndexSearcher searcher) throws IOException {
-    return new PhraseWeight(searcher);
+  public Weight createWeight(IndexSearcher searcher, boolean needsScores) throws IOException {
+    return new PhraseWeight(searcher, needsScores);
   }
 
   /**

@@ -20,7 +20,7 @@ package org.apache.lucene.search;
 import java.io.IOException;
 import java.util.Random;
 
-import org.apache.lucene.index.DocsEnum;
+import org.apache.lucene.index.PostingsEnum;
 
 import com.carrotsearch.randomizedtesting.generators.RandomInts;
 
@@ -50,12 +50,17 @@ final class AssertingBulkScorer extends BulkScorer {
   }
 
   @Override
+  public long cost() {
+    return in.cost();
+  }
+
+  @Override
   public void score(LeafCollector collector) throws IOException {
     assert max == 0;
-    collector = new AssertingLeafCollector(random, collector, 0, DocsEnum.NO_MORE_DOCS);
+    collector = new AssertingLeafCollector(random, collector, 0, PostingsEnum.NO_MORE_DOCS);
     if (random.nextBoolean()) {
       try {
-        final int next = score(collector, 0, DocsEnum.NO_MORE_DOCS);
+        final int next = score(collector, 0, PostingsEnum.NO_MORE_DOCS);
         assert next == DocIdSetIterator.NO_MORE_DOCS;
       } catch (UnsupportedOperationException e) {
         in.score(collector);
@@ -68,7 +73,7 @@ final class AssertingBulkScorer extends BulkScorer {
   @Override
   public int score(LeafCollector collector, int min, final int max) throws IOException {
     assert min >= this.max: "Scoring backward: min=" + min + " while previous max was max=" + this.max;
-    assert min < max : "max must be greater than min, got min=" + min + ", and max=" + max;
+    assert min <= max : "max must be greater than min, got min=" + min + ", and max=" + max;
     this.max = max;
     collector = new AssertingLeafCollector(random, collector, min, max);
     final int next = in.score(collector, min, max);

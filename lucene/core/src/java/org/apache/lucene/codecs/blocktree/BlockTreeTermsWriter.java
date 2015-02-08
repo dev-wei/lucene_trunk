@@ -93,7 +93,7 @@ import org.apache.lucene.util.packed.PackedInts;
  *   <li><tt>.tip</tt>: <a href="#Termindex">Term Index</a></li>
  * </ul>
  * <p>
- * <a name="Termdictionary" id="Termdictionary"></a>
+ * <a name="Termdictionary"></a>
  * <h3>Term Dictionary</h3>
  *
  * <p>The .tim file contains the list of terms in each
@@ -152,7 +152,7 @@ import org.apache.lucene.util.packed.PackedInts;
  *    <li>For inner nodes of the tree, every entry will steal one bit to mark whether it points
  *        to child nodes(sub-block). If so, the corresponding TermStats and TermMetaData are omitted </li>
  * </ul>
- * <a name="Termindex" id="Termindex"></a>
+ * <a name="Termindex"></a>
  * <h3>Term Index</h3>
  * <p>The .tip file contains an index into the term dictionary, so that it can be 
  * accessed randomly.  The index is also used to determine
@@ -256,16 +256,6 @@ public final class BlockTreeTermsWriter extends FieldsConsumer {
     throws IOException
   {
     validateSettings(minItemsInBlock, maxItemsInBlock);
-
-    if (minItemsInBlock <= 1) {
-      throw new IllegalArgumentException("minItemsInBlock must be >= 2; got " + minItemsInBlock);
-    }
-    if (minItemsInBlock > maxItemsInBlock) {
-      throw new IllegalArgumentException("maxItemsInBlock must be >= minItemsInBlock; got maxItemsInBlock=" + maxItemsInBlock + " minItemsInBlock=" + minItemsInBlock);
-    }
-    if (maxItemsInBlock < 2*(minItemsInBlock-1)) {
-      throw new IllegalArgumentException("maxItemsInBlock must be at least 2*(minItemsInBlock-1); got maxItemsInBlock=" + maxItemsInBlock + " minItemsInBlock=" + minItemsInBlock);
-    }
 
     this.maxDoc = state.segmentInfo.getDocCount();
     this.fieldInfos = state.fieldInfos;

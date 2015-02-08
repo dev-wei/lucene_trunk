@@ -22,6 +22,7 @@ import java.util.Arrays;
 
 import org.apache.lucene.index.*;
 import org.apache.lucene.search.similarities.Similarity;
+import org.apache.lucene.util.BytesRef;
 
 final class ExactPhraseScorer extends Scorer {
   private final int endMinus1;
@@ -35,31 +36,33 @@ final class ExactPhraseScorer extends Scorer {
   private final long cost;
 
   private final static class ChunkState {
-    final DocsAndPositionsEnum posEnum;
+    final PostingsEnum posEnum;
     final int offset;
     int posUpto;
     int posLimit;
     int pos;
     int lastPos;
 
-    public ChunkState(DocsAndPositionsEnum posEnum, int offset) {
+    public ChunkState(PostingsEnum posEnum, int offset) {
       this.posEnum = posEnum;
       this.offset = offset;
     }
   }
 
   private final ChunkState[] chunkStates;
-  private final DocsAndPositionsEnum lead;
+  private final PostingsEnum lead;
 
   private int docID = -1;
   private int freq;
 
   private final Similarity.SimScorer docScorer;
+  private final boolean needsScores;
   
   ExactPhraseScorer(Weight weight, PhraseQuery.PostingsAndFreq[] postings,
-                    Similarity.SimScorer docScorer) throws IOException {
+                    Similarity.SimScorer docScorer, boolean needsScores) throws IOException {
     super(weight);
     this.docScorer = docScorer;
+    this.needsScores = needsScores;
 
     chunkStates = new ChunkState[postings.length];
 
@@ -79,7 +82,7 @@ final class ExactPhraseScorer extends Scorer {
       // TODO: don't dup this logic from conjunctionscorer :)
       advanceHead: for(;;) {
         for (int i = 1; i < chunkStates.length; i++) {
-          final DocsAndPositionsEnum de = chunkStates[i].posEnum;
+          final PostingsEnum de = chunkStates[i].posEnum;
           if (de.docID() < doc) {
             int d = de.advance(doc);
 
@@ -122,6 +125,26 @@ final class ExactPhraseScorer extends Scorer {
   @Override
   public int freq() {
     return freq;
+  }
+
+  @Override
+  public int nextPosition() throws IOException {
+    return -1;
+  }
+
+  @Override
+  public int startOffset() throws IOException {
+    return -1;
+  }
+
+  @Override
+  public int endOffset() throws IOException {
+    return -1;
+  }
+
+  @Override
+  public BytesRef getPayload() throws IOException {
+    return null;
   }
 
   @Override
@@ -233,6 +256,9 @@ final class ExactPhraseScorer extends Scorer {
             final int posIndex = cs.pos - chunkStart;
             if (posIndex >= 0 && gens[posIndex] == gen && counts[posIndex] == endMinus1) {
               freq++;
+              if (!needsScores) {
+                return freq; // we determined there was a match.
+              }
             }
           }
 

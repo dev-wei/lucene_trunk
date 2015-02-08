@@ -39,7 +39,7 @@ import org.apache.lucene.document.SortedSetDocValuesField;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.BinaryDocValues;
 import org.apache.lucene.index.DocValues;
-import org.apache.lucene.index.DocsEnum;
+import org.apache.lucene.index.PostingsEnum;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.LeafReader;
 import org.apache.lucene.index.LeafReaderContext;
@@ -310,6 +310,11 @@ public class TestJoinUtil extends LuceneTestCase {
             assertFalse("optimized bulkScorer was not used for join query embedded in boolean query!", sawFive);
           }
         }
+        
+        @Override
+        public boolean needsScores() {
+          return false;
+        }
       });
 
     indexSearcher.getIndexReader().close();
@@ -495,6 +500,11 @@ public class TestJoinUtil extends LuceneTestCase {
               }
             };
           }
+          
+          @Override
+          public boolean needsScores() {
+            return topScoreDocCollector.needsScores();
+          }
         });
         // Asserting bit set...
         if (VERBOSE) {
@@ -673,6 +683,11 @@ public class TestJoinUtil extends LuceneTestCase {
           public void setScorer(Scorer scorer) {
             this.scorer = scorer;
           }
+
+          @Override
+          public boolean needsScores() {
+            return true;
+          }
         });
       } else {
         fromSearcher.search(new TermQuery(new Term("value", uniqueRandomValue)), new SimpleCollector() {
@@ -705,6 +720,11 @@ public class TestJoinUtil extends LuceneTestCase {
           public void setScorer(Scorer scorer) {
             this.scorer = scorer;
           }
+          
+          @Override
+          public boolean needsScores() {
+            return true;
+          }
         });
       }
 
@@ -713,17 +733,17 @@ public class TestJoinUtil extends LuceneTestCase {
         LeafReader slowCompositeReader = SlowCompositeReaderWrapper.wrap(toSearcher.getIndexReader());
         Terms terms = slowCompositeReader.terms(toField);
         if (terms != null) {
-          DocsEnum docsEnum = null;
+          PostingsEnum postingsEnum = null;
           TermsEnum termsEnum = null;
           SortedSet<BytesRef> joinValues = new TreeSet<>(BytesRef.getUTF8SortedAsUnicodeComparator());
           joinValues.addAll(joinValueToJoinScores.keySet());
           for (BytesRef joinValue : joinValues) {
             termsEnum = terms.iterator(termsEnum);
             if (termsEnum.seekExact(joinValue)) {
-              docsEnum = termsEnum.docs(slowCompositeReader.getLiveDocs(), docsEnum, DocsEnum.FLAG_NONE);
+              postingsEnum = termsEnum.postings(slowCompositeReader.getLiveDocs(), postingsEnum, PostingsEnum.FLAG_NONE);
               JoinScore joinScore = joinValueToJoinScores.get(joinValue);
 
-              for (int doc = docsEnum.nextDoc(); doc != DocIdSetIterator.NO_MORE_DOCS; doc = docsEnum.nextDoc()) {
+              for (int doc = postingsEnum.nextDoc(); doc != DocIdSetIterator.NO_MORE_DOCS; doc = postingsEnum.nextDoc()) {
                 // First encountered join value determines the score.
                 // Something to keep in mind for many-to-many relations.
                 if (!docToJoinScore.containsKey(doc)) {
@@ -757,6 +777,11 @@ public class TestJoinUtil extends LuceneTestCase {
 
           @Override
           public void setScorer(Scorer scorer) {}
+          
+          @Override
+          public boolean needsScores() {
+            return false;
+          }
         });
       }
       queryVals.put(uniqueRandomValue, docToJoinScore);
@@ -828,9 +853,9 @@ public class TestJoinUtil extends LuceneTestCase {
         }
 
         for (RandomDoc otherSideDoc : otherMatchingDocs) {
-          DocsEnum docsEnum = MultiFields.getTermDocsEnum(topLevelReader, MultiFields.getLiveDocs(topLevelReader), "id", new BytesRef(otherSideDoc.id), 0);
-          assert docsEnum != null;
-          int doc = docsEnum.nextDoc();
+          PostingsEnum postingsEnum = MultiFields.getTermDocsEnum(topLevelReader, MultiFields.getLiveDocs(topLevelReader), "id", new BytesRef(otherSideDoc.id), 0);
+          assert postingsEnum != null;
+          int doc = postingsEnum.nextDoc();
           expectedResult.set(doc);
         }
       }

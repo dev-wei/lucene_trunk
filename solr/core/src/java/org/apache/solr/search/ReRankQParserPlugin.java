@@ -17,16 +17,33 @@
 
 package org.apache.solr.search;
 
-import com.carrotsearch.hppc.IntIntOpenHashMap;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Map;
+import java.util.Set;
 
+import com.carrotsearch.hppc.IntFloatOpenHashMap;
+import com.carrotsearch.hppc.IntIntOpenHashMap;
+import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.index.Term;
 import org.apache.lucene.search.Explanation;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.LeafCollector;
 import org.apache.lucene.search.MatchAllDocsQuery;
-import org.apache.lucene.util.BytesRef;
+import org.apache.lucene.search.Query;
 import org.apache.lucene.search.QueryRescorer;
+import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.Scorer;
+import org.apache.lucene.search.Sort;
+import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.TopDocsCollector;
 import org.apache.lucene.search.TopFieldCollector;
 import org.apache.lucene.search.TopScoreDocCollector;
+import org.apache.lucene.search.Weight;
+import org.apache.lucene.util.Bits;
+import org.apache.lucene.util.BytesRef;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.params.SolrParams;
@@ -34,27 +51,7 @@ import org.apache.solr.common.util.NamedList;
 import org.apache.solr.handler.component.MergeStrategy;
 import org.apache.solr.handler.component.QueryElevationComponent;
 import org.apache.solr.request.SolrQueryRequest;
-import org.apache.lucene.search.LeafCollector;
-import org.apache.lucene.search.Query;
-import org.apache.lucene.search.Weight;
-import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.search.TopDocs;
-import org.apache.lucene.search.Scorer;
-import org.apache.lucene.search.Sort;
-import org.apache.lucene.index.Term;
-import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.search.ScoreDoc;
-
-import com.carrotsearch.hppc.IntFloatOpenHashMap;
-
-import org.apache.lucene.util.Bits;
 import org.apache.solr.request.SolrRequestInfo;
-
-import java.io.IOException;
-import java.util.Map;
-import java.util.Set;
-import java.util.Arrays;
-import java.util.Comparator;
 
 /*
 *
@@ -174,8 +171,8 @@ public class ReRankQParserPlugin extends QParserPlugin {
 
     }
 
-    public Weight createWeight(IndexSearcher searcher) throws IOException{
-      return new ReRankWeight(mainQuery, reRankQuery, reRankWeight, searcher);
+    public Weight createWeight(IndexSearcher searcher, boolean needsScores) throws IOException{
+      return new ReRankWeight(mainQuery, reRankQuery, reRankWeight, searcher, needsScores);
     }
   }
 
@@ -185,11 +182,12 @@ public class ReRankQParserPlugin extends QParserPlugin {
     private Weight mainWeight;
     private double reRankWeight;
 
-    public ReRankWeight(Query mainQuery, Query reRankQuery, double reRankWeight, IndexSearcher searcher) throws IOException {
+    public ReRankWeight(Query mainQuery, Query reRankQuery, double reRankWeight, IndexSearcher searcher, boolean needsScores) throws IOException {
+      super(mainQuery);
       this.reRankQuery = reRankQuery;
       this.searcher = searcher;
       this.reRankWeight = reRankWeight;
-      this.mainWeight = mainQuery.createWeight(searcher);
+      this.mainWeight = mainQuery.createWeight(searcher, needsScores);
     }
 
     public float getValueForNormalization() throws IOException {
@@ -198,10 +196,6 @@ public class ReRankQParserPlugin extends QParserPlugin {
 
     public Scorer scorer(LeafReaderContext context, Bits bits) throws IOException {
       return mainWeight.scorer(context, bits);
-    }
-
-    public Query getQuery() {
-      return mainWeight.getQuery();
     }
 
     public void normalize(float norm, float topLevelBoost) {
@@ -264,6 +258,11 @@ public class ReRankQParserPlugin extends QParserPlugin {
     @Override
     public LeafCollector getLeafCollector(LeafReaderContext context) throws IOException {
       return mainCollector.getLeafCollector(context);
+    }
+
+    @Override
+    public boolean needsScores() {
+      return true;
     }
 
     public TopDocs topDocs(int start, int howMany) {

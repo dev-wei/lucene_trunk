@@ -23,6 +23,7 @@ import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.RandomIndexWriter;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.store.Directory;
+import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.LuceneTestCase;
 
 public class TestScoreCachingWrappingScorer extends LuceneTestCase {
@@ -47,6 +48,26 @@ public class TestScoreCachingWrappingScorer extends LuceneTestCase {
       return 1;
     }
 
+    @Override
+    public int nextPosition() throws IOException {
+      return -1;
+    }
+
+    @Override
+    public int startOffset() throws IOException {
+      return -1;
+    }
+
+    @Override
+    public int endOffset() throws IOException {
+      return -1;
+    }
+
+    @Override
+    public BytesRef getPayload() throws IOException {
+      return null;
+    }
+
     @Override public int docID() { return doc; }
 
     @Override public int nextDoc() {
@@ -57,7 +78,7 @@ public class TestScoreCachingWrappingScorer extends LuceneTestCase {
       doc = target;
       return doc < scores.length ? doc : NO_MORE_DOCS;
     }
-    
+
     @Override
     public long cost() {
       return scores.length;
@@ -90,6 +111,11 @@ public class TestScoreCachingWrappingScorer extends LuceneTestCase {
     @Override public void setScorer(Scorer scorer) {
       this.scorer = new ScoreCachingWrappingScorer(scorer);
     }
+    
+    @Override
+    public boolean needsScores() {
+      return true;
+    }
 
   }
 
@@ -104,7 +130,7 @@ public class TestScoreCachingWrappingScorer extends LuceneTestCase {
     IndexReader ir = writer.getReader();
     writer.close();
     IndexSearcher searcher = newSearcher(ir);
-    Weight fake = new TermQuery(new Term("fake", "weight")).createWeight(searcher);
+    Weight fake = new TermQuery(new Term("fake", "weight")).createWeight(searcher, true);
     Scorer s = new SimpleScorer(fake);
     ScoreCachingCollector scc = new ScoreCachingCollector(scores.length);
     scc.setScorer(s);

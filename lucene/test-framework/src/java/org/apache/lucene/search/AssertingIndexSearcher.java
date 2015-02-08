@@ -22,9 +22,10 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 
-import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexReaderContext;
+import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.TestUtil;
 
 /**
@@ -55,13 +56,28 @@ public class AssertingIndexSearcher extends IndexSearcher {
   
   /** Ensures, that the returned {@code Weight} is not normalized again, which may produce wrong scores. */
   @Override
-  public Weight createNormalizedWeight(Query query) throws IOException {
-    final Weight w = super.createNormalizedWeight(query);
+  public Weight createNormalizedWeight(Query query, boolean needsScores) throws IOException {
+    final Weight w = super.createNormalizedWeight(query, needsScores);
     return new AssertingWeight(random, w) {
 
       @Override
       public void normalize(float norm, float topLevelBoost) {
         throw new IllegalStateException("Weight already normalized.");
+      }
+
+      @Override
+      public Scorer scorer(LeafReaderContext context, Bits acceptDocs) throws IOException {
+        Scorer scorer = w.scorer(context, acceptDocs);
+        if (scorer != null) {
+          // check that scorer obeys disi contract for docID() before next()/advance
+          try {
+            int docid = scorer.docID();
+            assert docid == -1 || docid == DocIdSetIterator.NO_MORE_DOCS;
+          } catch (UnsupportedOperationException ignored) {
+            // from a top-level BS1
+          }
+        }
+        return scorer;
       }
 
       @Override

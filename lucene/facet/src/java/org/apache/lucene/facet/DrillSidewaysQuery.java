@@ -19,8 +19,9 @@ package org.apache.lucene.facet;
 import java.io.IOException;
 import java.util.Arrays;
 
-import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.search.BulkScorer;
 import org.apache.lucene.search.Collector;
 import org.apache.lucene.search.DocIdSet;
 import org.apache.lucene.search.DocIdSetIterator;
@@ -29,10 +30,8 @@ import org.apache.lucene.search.Filter;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.Scorer;
-import org.apache.lucene.search.BulkScorer;
 import org.apache.lucene.search.Weight;
 import org.apache.lucene.util.Bits;
-
 /** Only purpose is to punch through and return a
  *  DrillSidewaysScorer */ 
 
@@ -74,8 +73,8 @@ class DrillSidewaysQuery extends Query {
   }
   
   @Override
-  public Weight createWeight(IndexSearcher searcher) throws IOException {
-    final Weight baseWeight = baseQuery.createWeight(searcher);
+  public Weight createWeight(IndexSearcher searcher, boolean needsScores) throws IOException {
+    final Weight baseWeight = baseQuery.createWeight(searcher, needsScores);
     final Object[] drillDowns = new Object[drillDownQueries.length];
     for(int dim=0;dim<drillDownQueries.length;dim++) {
       Query query = drillDownQueries[dim];
@@ -85,19 +84,14 @@ class DrillSidewaysQuery extends Query {
       } else {
         // TODO: would be nice if we could say "we will do no
         // scoring" here....
-        drillDowns[dim] = searcher.rewrite(query).createWeight(searcher);
+        drillDowns[dim] = searcher.rewrite(query).createWeight(searcher, needsScores);
       }
     }
 
-    return new Weight() {
+    return new Weight(DrillSidewaysQuery.this) {
       @Override
       public Explanation explain(LeafReaderContext context, int doc) throws IOException {
         return baseWeight.explain(context, doc);
-      }
-
-      @Override
-      public Query getQuery() {
-        return baseQuery;
       }
 
       @Override

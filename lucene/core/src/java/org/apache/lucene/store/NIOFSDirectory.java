@@ -47,13 +47,14 @@ import java.util.concurrent.Future; // javadoc
  * blocked on IO. The file descriptor will remain closed and subsequent access
  * to {@link NIOFSDirectory} will throw a {@link ClosedChannelException}. If
  * your application uses either {@link Thread#interrupt()} or
- * {@link Future#cancel(boolean)} you should use {@code RAFDirectory} in
- * favor of {@link NIOFSDirectory}.
+ * {@link Future#cancel(boolean)} you should use the legacy {@code RAFDirectory}
+ * from the Lucene {@code misc} module in favor of {@link NIOFSDirectory}.
  * </p>
  */
 public class NIOFSDirectory extends FSDirectory {
 
   /** Create a new NIOFSDirectory for the named location.
+   *  The directory is created at the named location if it does not yet exist.
    * 
    * @param path the path of the directory
    * @param lockFactory the lock factory to use
@@ -64,6 +65,7 @@ public class NIOFSDirectory extends FSDirectory {
   }
 
   /** Create a new NIOFSDirectory for the named location and {@link FSLockFactory#getDefault()}.
+   *  The directory is created at the named location if it does not yet exist.
    *
    * @param path the path of the directory
    * @throws IOException if there is a low-level I/O error

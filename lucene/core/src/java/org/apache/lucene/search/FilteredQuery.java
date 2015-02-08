@@ -17,16 +17,16 @@ package org.apache.lucene.search;
  * limitations under the License.
  */
 
-import org.apache.lucene.index.LeafReaderContext;
-import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.index.Term;
-import org.apache.lucene.util.Bits;
-import org.apache.lucene.util.ToStringUtils;
-
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
+
+import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.util.Bits;
+import org.apache.lucene.util.ToStringUtils;
 
 
 /**
@@ -78,9 +78,9 @@ public class FilteredQuery extends Query {
    * This is accomplished by overriding the Scorer returned by the Weight.
    */
   @Override
-  public Weight createWeight(final IndexSearcher searcher) throws IOException {
-    final Weight weight = query.createWeight (searcher);
-    return new Weight() {
+  public Weight createWeight(final IndexSearcher searcher, boolean needsScores) throws IOException {
+    final Weight weight = query.createWeight (searcher, needsScores);
+    return new Weight(FilteredQuery.this) {
 
       @Override
       public float getValueForNormalization() throws IOException { 
@@ -111,12 +111,6 @@ public class FilteredQuery extends Query {
         }
       }
 
-      // return this query
-      @Override
-      public Query getQuery() {
-        return FilteredQuery.this;
-      }
-
       // return a filtering scorer
       @Override
       public Scorer scorer(LeafReaderContext context, Bits acceptDocs) throws IOException {
@@ -143,6 +137,7 @@ public class FilteredQuery extends Query {
         }
 
         return strategy.filteredBulkScorer(context, weight, filterDocIdSet);
+
       }
     };
   }
@@ -153,13 +148,13 @@ public class FilteredQuery extends Query {
    * than document scoring or if the filter has a linear running time to compute
    * the next matching doc like exact geo distances.
    */
-  private static final class QueryFirstScorer extends Scorer {
+  private static final class QueryFirstScorer extends FilterScorer {
     private final Scorer scorer;
     private int scorerDoc = -1;
     private final Bits filterBits;
 
     protected QueryFirstScorer(Weight weight, Bits filterBits, Scorer other) {
-      super(weight);
+      super(other, weight);
       this.scorer = other;
       this.filterBits = filterBits;
     }
@@ -184,29 +179,16 @@ public class FilteredQuery extends Query {
         return scorerDoc = doc;
       }
     }
-
     @Override
     public int docID() {
       return scorerDoc;
     }
-    
-    @Override
-    public float score() throws IOException {
-      return scorer.score();
-    }
-    
-    @Override
-    public int freq() throws IOException { return scorer.freq(); }
-    
+
     @Override
     public Collection<ChildScorer> getChildren() {
       return Collections.singleton(new ChildScorer(scorer, "FILTERED"));
     }
 
-    @Override
-    public long cost() {
-      return scorer.cost();
-    }
   }
 
   private static class QueryFirstBulkScorer extends BulkScorer {
@@ -217,6 +199,11 @@ public class FilteredQuery extends Query {
     public QueryFirstBulkScorer(Scorer scorer, Bits filterBits) {
       this.scorer = scorer;
       this.filterBits = filterBits;
+    }
+
+    @Override
+    public long cost() {
+      return scorer.cost();
     }
 
     @Override
@@ -249,7 +236,7 @@ public class FilteredQuery extends Query {
    * jumping past the target document. When both land on the same document, it's
    * collected.
    */
-  private static final class LeapFrogScorer extends Scorer {
+  private static final class LeapFrogScorer extends FilterScorer {
     private final DocIdSetIterator secondary;
     private final DocIdSetIterator primary;
     private final Scorer scorer;
@@ -257,7 +244,7 @@ public class FilteredQuery extends Query {
     private int secondaryDoc = -1;
 
     protected LeapFrogScorer(Weight weight, DocIdSetIterator primary, DocIdSetIterator secondary, Scorer scorer) {
-      super(weight);
+      super(scorer, weight);
       this.primary = primary;
       this.secondary = secondary;
       this.scorer = scorer;
@@ -297,17 +284,7 @@ public class FilteredQuery extends Query {
     public final int docID() {
       return secondaryDoc;
     }
-    
-    @Override
-    public final float score() throws IOException {
-      return scorer.score();
-    }
-    
-    @Override
-    public final int freq() throws IOException {
-      return scorer.freq();
-    }
-    
+
     @Override
     public final Collection<ChildScorer> getChildren() {
       return Collections.singleton(new ChildScorer(scorer, "FILTERED"));
@@ -484,6 +461,7 @@ public class FilteredQuery extends Query {
       // ignore scoreDocsInOrder:
       return new Weight.DefaultBulkScorer(scorer);
     }
+
   }
   
   /**
@@ -582,8 +560,7 @@ public class FilteredQuery extends Query {
   private static final class QueryFirstFilterStrategy extends FilterStrategy {
     @Override
     public Scorer filteredScorer(final LeafReaderContext context,
-        Weight weight,
-        DocIdSet docIdSet) throws IOException {
+        Weight weight, DocIdSet docIdSet) throws IOException {
       Bits filterAcceptDocs = docIdSet.bits();
       if (filterAcceptDocs == null) {
         // Filter does not provide random-access Bits; we
@@ -591,14 +568,12 @@ public class FilteredQuery extends Query {
         return LEAP_FROG_QUERY_FIRST_STRATEGY.filteredScorer(context, weight, docIdSet);
       }
       final Scorer scorer = weight.scorer(context, null);
-      return scorer == null ? null : new QueryFirstScorer(weight,
-          filterAcceptDocs, scorer);
+      return scorer == null ? null : new QueryFirstScorer(weight, filterAcceptDocs, scorer);
     }
 
     @Override
     public BulkScorer filteredBulkScorer(final LeafReaderContext context,
-        Weight weight,
-        DocIdSet docIdSet) throws IOException {
+        Weight weight, DocIdSet docIdSet) throws IOException {
       Bits filterAcceptDocs = docIdSet.bits();
       if (filterAcceptDocs == null) {
         // Filter does not provide random-access Bits; we

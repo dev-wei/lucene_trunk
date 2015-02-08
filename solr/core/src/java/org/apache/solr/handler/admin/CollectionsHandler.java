@@ -869,6 +869,7 @@ public class CollectionsHandler extends RequestHandlerBase {
 
   private void createSysConfigSet() throws KeeperException, InterruptedException {
     SolrZkClient zk = coreContainer.getZkController().getZkStateReader().getZkClient();
+    createNodeIfNotExists(zk,ZkStateReader.CONFIGS_ZKNODE, null);
     createNodeIfNotExists(zk,ZkStateReader.CONFIGS_ZKNODE+"/"+SYSTEM_COLL, null);
     createNodeIfNotExists(zk,ZkStateReader.CONFIGS_ZKNODE+"/"+SYSTEM_COLL+"/schema.xml", BlobHandler.SCHEMA.replaceAll("'","\"").getBytes(StandardCharsets.UTF_8));
     createNodeIfNotExists(zk, ZkStateReader.CONFIGS_ZKNODE + "/" + SYSTEM_COLL + "/solrconfig.xml", BlobHandler.CONF.replaceAll("'", "\"").getBytes(StandardCharsets.UTF_8));
@@ -1050,9 +1051,16 @@ public class CollectionsHandler extends RequestHandlerBase {
    * @throws InterruptedException connection interrupted
    */
   private void handleListAction(SolrQueryRequest req, SolrQueryResponse rsp) throws KeeperException, InterruptedException {
-    Map<String, Object> props = ZkNodeProps.makeMap(
-        Overseer.QUEUE_OPERATION, CollectionAction.LIST.toString().toLowerCase(Locale.ROOT));
-    handleResponse(CollectionAction.LIST.toString(), new ZkNodeProps(props), rsp);
+    NamedList<Object> results = new NamedList<>();
+    Set<String> collections = coreContainer.getZkController().getZkStateReader().getClusterState().getCollections();
+    List<String> collectionList = new ArrayList<>();
+    for (String collection : collections) {
+      collectionList.add(collection);
+    }
+    results.add("collections", collectionList);
+    SolrResponse response = new OverseerSolrResponse(results);
+
+    rsp.getValues().addAll(response.getResponse());
   }
 
 

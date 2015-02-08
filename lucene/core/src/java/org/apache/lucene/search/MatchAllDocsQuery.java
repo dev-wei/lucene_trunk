@@ -17,14 +17,15 @@ package org.apache.lucene.search;
  * limitations under the License.
  */
 
-import org.apache.lucene.index.LeafReaderContext;
-import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.index.Term;
-import org.apache.lucene.util.ToStringUtils;
-import org.apache.lucene.util.Bits;
-
-import java.util.Set;
 import java.io.IOException;
+import java.util.Set;
+
+import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.util.Bits;
+import org.apache.lucene.util.BytesRef;
+import org.apache.lucene.util.ToStringUtils;
 
 /**
  * A query that matches all documents.
@@ -73,6 +74,26 @@ public class MatchAllDocsQuery extends Query {
     }
 
     @Override
+    public int nextPosition() throws IOException {
+      return -1;
+    }
+
+    @Override
+    public int startOffset() throws IOException {
+      return -1;
+    }
+
+    @Override
+    public int endOffset() throws IOException {
+      return -1;
+    }
+
+    @Override
+    public BytesRef getPayload() throws IOException {
+      return null;
+    }
+
+    @Override
     public int advance(int target) throws IOException {
       doc = target-1;
       return nextDoc();
@@ -89,16 +110,12 @@ public class MatchAllDocsQuery extends Query {
     private float queryNorm;
 
     public MatchAllDocsWeight(IndexSearcher searcher) {
+      super(MatchAllDocsQuery.this);
     }
 
     @Override
     public String toString() {
       return "weight(" + MatchAllDocsQuery.this + ")";
-    }
-
-    @Override
-    public Query getQuery() {
-      return MatchAllDocsQuery.this;
     }
 
     @Override
@@ -133,7 +150,7 @@ public class MatchAllDocsQuery extends Query {
   }
 
   @Override
-  public Weight createWeight(IndexSearcher searcher) {
+  public Weight createWeight(IndexSearcher searcher, boolean needsScores) {
     return new MatchAllDocsWeight(searcher);
   }
 

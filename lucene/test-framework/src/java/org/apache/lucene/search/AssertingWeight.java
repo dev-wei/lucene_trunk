@@ -33,6 +33,7 @@ class AssertingWeight extends Weight {
   final Weight in;
 
   AssertingWeight(Random random, Weight in) {
+    super(in.getQuery());
     this.random = random;
     this.in = in;
   }
@@ -40,11 +41,6 @@ class AssertingWeight extends Weight {
   @Override
   public Explanation explain(LeafReaderContext context, int doc) throws IOException {
     return in.explain(context, doc);
-  }
-
-  @Override
-  public Query getQuery() {
-    return in.getQuery();
   }
 
   @Override

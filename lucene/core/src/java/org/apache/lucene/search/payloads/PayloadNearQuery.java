@@ -17,11 +17,15 @@ package org.apache.lucene.search.payloads;
  * limitations under the License.
  */
 
+import java.io.IOException;
+import java.util.Collection;
+import java.util.Iterator;
+
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.search.ComplexExplanation;
 import org.apache.lucene.search.Explanation;
-import org.apache.lucene.search.Scorer;
 import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.Scorer;
 import org.apache.lucene.search.Weight;
 import org.apache.lucene.search.similarities.DefaultSimilarity;
 import org.apache.lucene.search.similarities.Similarity;
@@ -37,20 +41,16 @@ import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.ToStringUtils;
 
-import java.io.IOException;
-import java.util.Collection;
-import java.util.Iterator;
-
 /**
  * This class is very similar to
  * {@link org.apache.lucene.search.spans.SpanNearQuery} except that it factors
  * in the value of the payloads located at each of the positions where the
  * {@link org.apache.lucene.search.spans.TermSpans} occurs.
- * <p/>
+ * <p>
  * NOTE: In order to take advantage of this with the default scoring implementation
  * ({@link DefaultSimilarity}), you must override {@link DefaultSimilarity#scorePayload(int, int, int, BytesRef)},
  * which returns 1 by default.
- * <p/>
+ * <p>
  * Payload scores are aggregated using a pluggable {@link PayloadFunction}.
  * 
  * @see org.apache.lucene.search.similarities.Similarity.SimScorer#computePayloadFactor(int, int, int, BytesRef)
@@ -71,7 +71,7 @@ public class PayloadNearQuery extends SpanNearQuery {
   }
 
   @Override
-  public Weight createWeight(IndexSearcher searcher) throws IOException {
+  public Weight createWeight(IndexSearcher searcher, boolean needsScores) throws IOException {
     return new PayloadNearSpanWeight(this, searcher);
   }
 

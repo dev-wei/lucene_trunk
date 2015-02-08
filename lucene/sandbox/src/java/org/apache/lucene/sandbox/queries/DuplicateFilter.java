@@ -18,7 +18,7 @@ package org.apache.lucene.sandbox.queries;
 
 import java.io.IOException;
 
-import org.apache.lucene.index.DocsEnum;
+import org.apache.lucene.index.PostingsEnum;
 import org.apache.lucene.index.LeafReader;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.SlowCompositeReaderWrapper;
@@ -59,7 +59,7 @@ public class DuplicateFilter extends Filter {
   /**
    * "Full" processing mode starts by setting all bits to false and only setting bits
    * for documents that contain the given field and are identified as none-duplicates.
-   * <p/>
+   * <p>
    * "Fast" processing sets all bits to true then unsets all duplicate docs found for the
    * given field. This approach avoids the need to read DocsEnum for terms that are seen
    * to have a document frequency of exactly "1" (i.e. no duplicates). While a potentially
@@ -100,13 +100,13 @@ public class DuplicateFilter extends Filter {
 
     if (terms != null) {
       TermsEnum termsEnum = terms.iterator(null);
-      DocsEnum docs = null;
+      PostingsEnum docs = null;
       while (true) {
         BytesRef currTerm = termsEnum.next();
         if (currTerm == null) {
           break;
         } else {
-          docs = termsEnum.docs(acceptDocs, docs, DocsEnum.FLAG_NONE);
+          docs = termsEnum.postings(acceptDocs, docs, PostingsEnum.FLAG_NONE);
           int doc = docs.nextDoc();
           if (doc != DocIdSetIterator.NO_MORE_DOCS) {
             if (keepMode == KeepMode.KM_USE_FIRST_OCCURRENCE) {
@@ -136,7 +136,7 @@ public class DuplicateFilter extends Filter {
 
     if (terms != null) {
       TermsEnum termsEnum = terms.iterator(null);
-      DocsEnum docs = null;
+      PostingsEnum docs = null;
       while (true) {
         BytesRef currTerm = termsEnum.next();
         if (currTerm == null) {
@@ -144,7 +144,7 @@ public class DuplicateFilter extends Filter {
         } else {
           if (termsEnum.docFreq() > 1) {
             // unset potential duplicates
-            docs = termsEnum.docs(acceptDocs, docs, DocsEnum.FLAG_NONE);
+            docs = termsEnum.postings(acceptDocs, docs, PostingsEnum.FLAG_NONE);
             int doc = docs.nextDoc();
             if (doc != DocIdSetIterator.NO_MORE_DOCS) {
               if (keepMode == KeepMode.KM_USE_FIRST_OCCURRENCE) {

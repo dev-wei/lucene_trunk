@@ -17,10 +17,11 @@ package org.apache.lucene.search;
  * limitations under the License.
  */
 
-import java.io.IOException;
-
+import org.apache.lucene.index.PostingsEnum;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.util.Bits;
+
+import java.io.IOException;
 
 /** 
  * Constrains search results to only match those which also match a provided
@@ -52,7 +53,7 @@ public class QueryWrapperFilter extends Filter {
   public DocIdSet getDocIdSet(final LeafReaderContext context, final Bits acceptDocs) throws IOException {
     // get a private context that is used to rewrite, createWeight and score eventually
     final LeafReaderContext privateContext = context.reader().getContext();
-    final Weight weight = new IndexSearcher(privateContext).createNormalizedWeight(query);
+    final Weight weight = new IndexSearcher(privateContext).createNormalizedWeight(query, false);
     return new DocIdSet() {
       @Override
       public DocIdSetIterator iterator() throws IOException {

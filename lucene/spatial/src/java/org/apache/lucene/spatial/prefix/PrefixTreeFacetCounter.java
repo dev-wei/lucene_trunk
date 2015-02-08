@@ -20,7 +20,7 @@ package org.apache.lucene.spatial.prefix;
 import java.io.IOException;
 
 import com.spatial4j.core.shape.Shape;
-import org.apache.lucene.index.DocsEnum;
+import org.apache.lucene.index.PostingsEnum;
 import org.apache.lucene.index.IndexReaderContext;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.search.DocIdSet;
@@ -114,15 +114,14 @@ public class PrefixTreeFacetCounter {
 
     //AbstractVisitingPrefixTreeFilter is a Lucene Filter.  We don't need a filter; we use it for its great prefix-tree
     // traversal code.  TODO consider refactoring if/when it makes sense (more use cases than this)
-    new AbstractVisitingPrefixTreeFilter(queryShape, strategy.getFieldName(), tree, facetLevel, scanLevel) {
+    new AbstractVisitingPrefixTreeFilter(queryShape, strategy.getFieldName(), tree, facetLevel, scanLevel,
+        !strategy.isPointsOnly()) {
 
       @Override
       public DocIdSet getDocIdSet(LeafReaderContext context, Bits acceptDocs) throws IOException {
         assert facetLevel == super.detailLevel;//same thing, FYI. (constant)
 
-        final boolean hasIndexedLeaves = !strategy.isPointsOnly();
-
-        return new VisitorTemplate(context, acceptDocs, hasIndexedLeaves) {
+        return new VisitorTemplate(context, acceptDocs) {
 
           @Override
           protected void start() throws IOException {
@@ -169,8 +168,8 @@ public class PrefixTreeFacetCounter {
               return termsEnum.docFreq();
             }
             int count = 0;
-            docsEnum = termsEnum.docs(acceptDocs, docsEnum, DocsEnum.FLAG_NONE);
-            while (docsEnum.nextDoc() != DocIdSetIterator.NO_MORE_DOCS) {
+            postingsEnum = termsEnum.postings(acceptDocs, postingsEnum, PostingsEnum.FLAG_NONE);
+            while (postingsEnum.nextDoc() != DocIdSetIterator.NO_MORE_DOCS) {
               count++;
             }
             return count;
@@ -180,8 +179,8 @@ public class PrefixTreeFacetCounter {
             if (acceptDocs == null) {
               return true;
             }
-            docsEnum = termsEnum.docs(acceptDocs, docsEnum, DocsEnum.FLAG_NONE);
-            return (docsEnum.nextDoc() != DocIdSetIterator.NO_MORE_DOCS);
+            postingsEnum = termsEnum.postings(acceptDocs, postingsEnum, PostingsEnum.FLAG_NONE);
+            return (postingsEnum.nextDoc() != DocIdSetIterator.NO_MORE_DOCS);
           }
 
         }.getDocIdSet();

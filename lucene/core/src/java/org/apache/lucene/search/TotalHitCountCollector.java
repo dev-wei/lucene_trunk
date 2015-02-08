@@ -17,7 +17,6 @@ package org.apache.lucene.search;
  * limitations under the License.
  */
 
-
 /**
  * Just counts the total number of hits.
  */
@@ -33,5 +32,10 @@ public class TotalHitCountCollector extends SimpleCollector {
   @Override
   public void collect(int doc) {
     totalHits++;
+  }
+
+  @Override
+  public boolean needsScores() {
+    return false;
   }
 }

@@ -602,7 +602,7 @@ public class HighlighterTest extends BaseTokenStreamTestCase implements Formatte
     
     BooleanQuery booleanQuery = new BooleanQuery();
     booleanQuery.add(new ToChildBlockJoinQuery(new TermQuery(
-        new Term(FIELD_NAME, "parent")), parentFilter, false), Occur.MUST);
+        new Term(FIELD_NAME, "parent")), parentFilter), Occur.MUST);
     booleanQuery.add(new TermQuery(new Term(FIELD_NAME, "child")), Occur.MUST);
     query = booleanQuery;
     
@@ -2040,22 +2040,22 @@ public class HighlighterTest extends BaseTokenStreamTestCase implements Formatte
     Document doc = new Document();
     doc.add(new IntField(NUMERIC_FIELD_NAME, 1, Field.Store.NO));
     doc.add(new StoredField(NUMERIC_FIELD_NAME, 1));
-    writer.addDocument(doc, analyzer);
+    writer.addDocument(doc);
 
     doc = new Document();
     doc.add(new IntField(NUMERIC_FIELD_NAME, 3, Field.Store.NO));
     doc.add(new StoredField(NUMERIC_FIELD_NAME, 3));
-    writer.addDocument(doc, analyzer);
+    writer.addDocument(doc);
 
     doc = new Document();
     doc.add(new IntField(NUMERIC_FIELD_NAME, 5, Field.Store.NO));
     doc.add(new StoredField(NUMERIC_FIELD_NAME, 5));
-    writer.addDocument(doc, analyzer);
+    writer.addDocument(doc);
 
     doc = new Document();
     doc.add(new IntField(NUMERIC_FIELD_NAME, 7, Field.Store.NO));
     doc.add(new StoredField(NUMERIC_FIELD_NAME, 7));
-    writer.addDocument(doc, analyzer);
+    writer.addDocument(doc);
 
     Document childDoc = doc(FIELD_NAME, "child document");
     Document parentDoc = doc(FIELD_NAME, "parent document");

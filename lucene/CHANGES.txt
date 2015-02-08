@@ -31,6 +31,16 @@ API Changes
 
 ======================= Lucene 5.1.0 =======================
 
+New Features
+
+* LUCENE-3922: Added JapaneseNumberFilter that normalizes Japanese numbers
+  in kansuji form to regular/Arabic numbers. (Gaute Lambertsen, Christian Moen)
+
+Bug Fixes
+
+* Spatial pointsOnly flag on PrefixTreeStrategy shouldn't switch all predicates to
+  Intersects. (David Smiley)
+
 Optimizations
 
 * LUCENE-6183, LUCENE-5647: Avoid recompressing stored fields
@@ -46,10 +56,35 @@ Optimizations
   instead of a separate merge sort for each segment.  In delete-heavy
   use cases this can be a sizable speedup. (Mike McCandless)
 
+* LUCENE-6201: BooleanScorer can now deal with values of minShouldMatch that
+  are greater than one and is used when queries produce dense result sets.
+  (Adrien Grand)
+
+* LUCENE-6218: Don't decode frequencies or match all positions when scoring
+  is not needed. (Robert Muir)
+
 API Changes
 
 * LUCENE-6204, LUCENE-6208: Simplify CompoundFormat: remove files()
   and remove files parameter to write(). (Robert Muir)
+
+* LUCENE-6217: Add IndexWriter.isOpen and getTragicException.  (Simon
+  Willnauer, Mike McCandless)
+
+* LUCENE-6218, LUCENE-6220: Add Collector.needsScores() and needsScores
+  parameter to Query.createWeight(). (Robert Muir, Adrien Grand)
+
+* LUCENE-4524: Merge DocsEnum and DocsAndPositionsEnum into a single
+  PostingsEnum iterator.  TermsEnum.docs() and TermsEnum.docsAndPositions()
+  are replaced by TermsEnum.postings(). (Alan Woodward, Simon Willnauer,
+  Robert Muir)
+
+* LUCENE-6222: Removed TermFilter, use a QueryWrapperFilter(TermQuery)
+  instead. This will be as efficient now that queries can opt out from
+  scoring. (Adrien Grand)
+
+* LUCENE-6223: Move BooleanQuery.BooleanWeight to BooleanWeight.
+  (Robert Muir)
 
 Other
 
@@ -392,6 +427,11 @@ API Changes
   Weight.scoresDocsOutOfOrder and LeafCollector.acceptsDocsOutOfOrder have been
   removed and boolean queries now always score in order.
 
+* LUCENE-6212: IndexWriter no longer accepts per-document Analyzer to
+  add/updateDocument.  These methods were trappy as they made it
+  easy to accidentally index tokens that were not easily
+  searchable. (Mike McCandless)
+
 Bug Fixes
 
 * LUCENE-5650: Enforce read-only access to any path outside the temporary
@@ -424,6 +464,11 @@ Bug Fixes
 
 * LUCENE-6041: Remove sugar methods FieldInfo.isIndexed and
   FieldInfo.hasDocValues.  (Robert Muir, Mike McCandless)
+
+* LUCENE-6044: Fix backcompat support for token filters with enablePositionIncrements=false.
+  Also fixed backcompat for TrimFilter with updateOffsets=true.  These options
+  are supported with a match version before 4.4, and no longer valid at all with 5.0.
+  (Ryan Ernst) 
 
 * LUCENE-6042: CustomScoreQuery explain was incorrect in some cases,
   such as when nested inside a boolean query. (Denis Lantsman via Robert Muir)
@@ -482,6 +527,15 @@ Bug Fixes
   
 * LUCENE-6192: Fix int overflow corruption case in skip data for
   high frequency terms in extremely large indices (Robert Muir, Mike
+  McCandless)
+
+* LUCENE-6093: Don't throw NullPointerException from
+  BlendedInfixSuggester for lookups that do not end in a prefix
+  token.  (jane chang via Mike McCandless)
+
+* LUCENE-6214: Fixed IndexWriter deadlock when one thread is
+  committing while another opens a near-real-time reader and an
+  unrecoverable (tragic) exception is hit.  (Simon Willnauer, Mike
   McCandless)
 
 Documentation
@@ -548,17 +602,75 @@ Other
 
 ======================= Lucene 4.10.4 ======================
 
+Bug fixes
+
+* LUCENE-6019, LUCENE-6117: Remove -Dtests.assert to make IndexWriter
+  infoStream sane.  (Robert Muir, Mike McCandless)
+
+* LUCENE-6161: Resolving deletes was failing to reuse DocsEnum likely
+  causing substantial performance cost for use cases that frequently
+  delete old documents (Mike McCandless)
+
+* LUCENE-6192: Fix int overflow corruption case in skip data for
+  high frequency terms in extremely large indices (Robert Muir, Mike
+  McCandless)
+
 * LUCENE-6207: Fixed consumption of several terms enums on the same
   sorted (set) doc values instance at the same time.
   (Tom Shally, Robert Muir, Adrien Grand)
+
+API Changes
+
+* LUCENE-6212: Deprecate IndexWriter APIs that accept per-document Analyzer.
+  These methods were trappy as they made it easy to accidentally index
+  tokens that were not easily searchable and will be removed in 5.0.0.
+  (Mike McCandless)
 
 ======================= Lucene 4.10.3 ======================
 
 Bug fixes
 
+* LUCENE-6046: Add maxDeterminizedStates safety to determinize (which has
+  an exponential worst case) so that if it would create too many states, it
+  now throws an exception instead of exhausting CPU/RAM.  (Nik
+  Everett via Mike McCandless)
+
+* LUCENE-6054: Allow repeating the empty automaton (Nik Everett via
+  Mike McCandless)
+
+* LUCENE-6049: Don't throw cryptic exception writing a segment when
+  the only docs in it had fields that hit non-aborting exceptions
+  during indexing but also had doc values.  (Mike McCandless)
+
+* LUCENE-6060: Deprecate IndexWriter.unlock (Simon Willnauer, Mike
+  McCandless)
+
 * LUCENE-3229: Overlapping ordered SpanNearQuery spans should not match.
   (Ludovic Boutros, Paul Elschot, Greg Dearing, ehatcher)
 
+* LUCENE-6004: Don't highlight the LookupResult.key returned from
+  AnalyzingInfixSuggester (Christian Reuschling, jane chang via Mike McCandless)
+
+* LUCENE-6075: Don't overflow int in SimpleRateLimiter (Boaz Leskes
+  via Mike McCandless)
+  
+* LUCENE-5980: Don't let document length overflow. (Robert Muir)
+
+* LUCENE-6042: CustomScoreQuery explain was incorrect in some cases,
+  such as when nested inside a boolean query. (Denis Lantsman via Robert Muir)
+
+* LUCENE-5948: RateLimiter now fully inits itself on init.  (Varun
+  Thacker via Mike McCandless)
+
+* LUCENE-6055: PayloadAttribute.clone() now does a deep clone of the underlying
+  bytes. (Shai Erera)
+
+* LUCENE-6094: Allow IW.rollback to stop ConcurrentMergeScheduler even
+  when it's stalling because there are too many merges. (Mike McCandless)
+  
+Documentation
+
+* LUCENE-6057: Improve Sort(SortField) docs (Martin Braun via Mike McCandless)
 
 ======================= Lucene 4.10.2 ======================
 

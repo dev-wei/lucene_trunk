@@ -16,6 +16,7 @@ package org.apache.lucene.search.highlight;
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 import java.io.IOException;
 
 import org.apache.lucene.analysis.TokenStream;
@@ -24,7 +25,7 @@ import org.apache.lucene.analysis.tokenattributes.OffsetAttribute;
 import org.apache.lucene.analysis.tokenattributes.PackedTokenAttributeImpl;
 import org.apache.lucene.analysis.tokenattributes.PayloadAttribute;
 import org.apache.lucene.analysis.tokenattributes.PositionIncrementAttribute;
-import org.apache.lucene.index.DocsAndPositionsEnum;
+import org.apache.lucene.index.PostingsEnum;
 import org.apache.lucene.index.Terms;
 import org.apache.lucene.index.TermsEnum;
 import org.apache.lucene.util.AttributeFactory;
@@ -40,7 +41,7 @@ import org.apache.lucene.util.UnicodeUtil;
  * because you know the term vector has payloads, since the first call to incrementToken() will observe if you asked
  * for them and if not then won't get them.  This TokenStream supports an efficient {@link #reset()}, so there's
  * no need to wrap with a caching impl.
- * <p />
+ * <p>
  * The implementation will create an array of tokens indexed by token position.  As long as there aren't massive jumps
  * in positions, this is fine.  And it assumes there aren't large numbers of tokens at the same position, since it adds
  * them to a linked-list per position in O(N^2) complexity.  When there aren't positions in the term vector, it divides
@@ -122,7 +123,7 @@ public final class TokenStreamFromTermVector extends TokenStream {
 
     final TermsEnum termsEnum = vector.iterator(null);
     BytesRef termBytesRef;
-    DocsAndPositionsEnum dpEnum = null;
+    PostingsEnum dpEnum = null;
     //int sumFreq = 0;
     while ((termBytesRef = termsEnum.next()) != null) {
       //Grab the term (in same way as BytesRef.utf8ToString() but we don't want a String obj)
@@ -130,7 +131,7 @@ public final class TokenStreamFromTermVector extends TokenStream {
       final char[] termChars = new char[termBytesRef.length];
       final int termCharsLen = UnicodeUtil.UTF8toUTF16(termBytesRef, termChars);
 
-      dpEnum = termsEnum.docsAndPositions(null, dpEnum);
+      dpEnum = termsEnum.postings(null, dpEnum, PostingsEnum.FLAG_POSITIONS);
       assert dpEnum != null; // presumably checked by TokenSources.hasPositions earlier
       dpEnum.nextDoc();
       final int freq = dpEnum.freq();

@@ -39,6 +39,7 @@ import org.apache.lucene.util.ArrayUtil;
 import org.apache.lucene.util.BitDocIdSet;
 import org.apache.lucene.util.BitSet;
 import org.apache.lucene.util.Bits;
+import org.apache.lucene.util.BytesRef;
 
 /**
  * This query requires that you index
@@ -119,8 +120,8 @@ public class ToParentBlockJoinQuery extends Query {
   }
 
   @Override
-  public Weight createWeight(IndexSearcher searcher) throws IOException {
-    return new BlockJoinWeight(this, childQuery.createWeight(searcher), parentsFilter, scoreMode);
+  public Weight createWeight(IndexSearcher searcher, boolean needsScores) throws IOException {
+    return new BlockJoinWeight(this, childQuery.createWeight(searcher, needsScores), parentsFilter, scoreMode);
   }
   
   /** Return our child query. */
@@ -135,16 +136,11 @@ public class ToParentBlockJoinQuery extends Query {
     private final ScoreMode scoreMode;
 
     public BlockJoinWeight(Query joinQuery, Weight childWeight, BitDocIdSetFilter parentsFilter, ScoreMode scoreMode) {
-      super();
+      super(joinQuery);
       this.joinQuery = joinQuery;
       this.childWeight = childWeight;
       this.parentsFilter = parentsFilter;
       this.scoreMode = scoreMode;
-    }
-
-    @Override
-    public Query getQuery() {
-      return joinQuery;
     }
 
     @Override
@@ -367,6 +363,26 @@ public class ToParentBlockJoinQuery extends Query {
     @Override
     public int freq() {
       return parentFreq;
+    }
+
+    @Override
+    public int nextPosition() throws IOException {
+      return -1;
+    }
+
+    @Override
+    public int startOffset() throws IOException {
+      return -1;
+    }
+
+    @Override
+    public int endOffset() throws IOException {
+      return -1;
+    }
+
+    @Override
+    public BytesRef getPayload() throws IOException {
+      return null;
     }
 
     @Override
